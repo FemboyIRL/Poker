@@ -4,7 +4,7 @@ from game.deck import create_deck, shuffle_deck
 from game.game_state import GameState
 from game.player.player import Player
 
-state = GameState(hand_id=1, dealer_position=0, small_blind=50, big_blind=100)
+state = GameState(hand_id=1, small_blind=50, big_blind=100)
 
 # Agregar jugadores
 state.player_manager.add_player(Player(1, "Cheems", 20000))
