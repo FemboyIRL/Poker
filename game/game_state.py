@@ -1,8 +1,10 @@
 from game.action_history import ActionHistory
 from game.community_cards import CommunityCards
+from game.deck import create_deck, shuffle_deck
 from game.game_info import GameInfo
 from game.player.player_manager import PlayerManager
 from game.pot.pot_manager import PotManager
+from game.utils import PokerPhase
 
 
 class GameState:
@@ -14,12 +16,84 @@ class GameState:
         self.pot_manager = PotManager()
         self.player_manager = PlayerManager()
         self.action_history = ActionHistory()
+        self.deck = []
+
+        # Numero de rondas transcurridas
+        self.round_number = 1
+
+        # ID de la fase actual de la ronda         
+        self.phase_round = PokerPhase.PRE_FLOP
+
+        # ID del jugador que tiene el boton(gira a la derecha cada ronda)
+        self.current_button_player_id: int = 0 
 
         # ID del jugador actual que debe tomar decisión
         self.current_player_id: int = None
 
         # Acciones legales actuales
         self.legal_actions = []
+
+    def start_game(self):
+        self.deck = shuffle_deck(create_deck())
+        self.phase_round = PokerPhase.PRE_FLOP
+        self.run_round()
+
+    def advance_round(self):
+        current_value = self.phase_round.value
+        next_value = current_value + 1
+
+        # Evita pasar de SHOWDOWN
+        if next_value > PokerPhase.SHOWDOWN.value:
+            return
+
+        self.phase_round = PokerPhase(next_value)
+        self.run_round()
+
+    def ask_player_for_action(self):
+        return
+
+    def run_round(self):
+        match self.phase_round:
+            case PokerPhase.PRE_FLOP:
+                print("Repartiendo cartas iniciales...")
+                self.run_pre_flop()
+
+            case PokerPhase.FLOP:
+                print("Mostrando el Flop...")
+                self.run_flop()
+
+            case PokerPhase.TURN:
+                print("Mostrando el Turn...")
+                self.run_turn()
+
+            case PokerPhase.RIVER:
+                print("Mostrando el River...")
+                self.run_river()
+
+            case PokerPhase.SHOWDOWN:
+                print("Showdown: Determinando ganador...")
+
+    def run_pre_flop(self):
+        for _, player in enumerate(self.player_manager.get_active_players()):
+            player.hole_cards = [self.deck.pop(), self.deck.pop()]
+            print(player)
+        self.advance_round()
+
+    def run_flop(self):
+        for _ in range(3):
+            self.community_cards.add_card(self.deck.pop())
+        print(self.community_cards.cards)
+        self.advance_round()
+    
+    def run_turn(self):
+        self.community_cards.add_card(self.deck.pop())
+        print(self.community_cards.cards)
+        self.advance_round()
+
+    def run_river(self):
+        self.community_cards.add_card(self.deck.pop())
+        print(self.community_cards.cards)
+        self.advance_round()
 
     def to_dict(self, player_id: int):
         """Convierte el estado a un dict seguro para un bot específico."""
