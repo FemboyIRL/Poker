@@ -37,6 +37,7 @@ class GameState:
         self.deck = shuffle_deck(create_deck())
         self.current_button_player_id = 1
         self.phase_round = PokerPhase.PRE_FLOP
+        self.info.current_bet = self.info.big_blind
         self.run_round()
 
     def advance_round(self):
@@ -53,22 +54,97 @@ class GameState:
 
     def run_bet_rounds(self):
         for _, player in enumerate(self.player_manager.get_active_players()):
+            self.legal_actions = self.get_legal_actions(player=player)
             action = self.ask_player_for_action(player_id=player.id)
             self.process_action(action=action, player=player)
 
+    def get_legal_actions(self, player):
+
+        actions = []
+
+        # Si no hay apuestas en la mesa, el jugador puede hacer CHECK o RAISE
+        if self.info.current_bet == 0:
+            actions.append(ActionType.CHECK)
+            actions.append(ActionType.RAISE)
+
+        else:
+            # Hay una apuesta activa, el jugador debe igualar o retirarse
+            if player.stack + player.current_bet >= self.info.current_bet:
+                actions.append(ActionType.CALL)
+            else:
+                # No tiene suficiente para igualar → solo puede ir ALL-IN o FOLD
+                actions.append(ActionType.CALL)  # Consideramos CALL como ALL-IN aquí
+            actions.append(ActionType.RAISE)
+            actions.append(ActionType.FOLD)
+
+        return actions
+
+
     def ask_player_for_action(self, player_id):
-        return Action(action_type=ActionType.CHECK, amount=200, player_id=player_id)
+        return Action(action_type=ActionType.CALL, amount=100, player_id=player_id)
 
     def process_action(self, action, player):
-        match (action):
+        if player.status == PlayerStatus.FOLDED:
+            raise ValueError("El jugador ya se ha retirado de la mano")
+        
+        if player.is_all_in:
+            raise ValueError("El jugador ya está all-in y no puede tomar más acciones")
+        
+        print(f"Jugador {player.id}")
+
+        print(action)
+
+        match (action.action_type):
             case ActionType.FOLD:
                 player.fold()
+        
             case ActionType.CHECK:
-                # Check Logic
-                return
+                if self.info.current_bet > player.current_bet:
+                    raise ValueError("No puedes hacer check cuando hay una apuesta activa")
+                # Check válido -> no cambia nada
+        
             case ActionType.CALL:
-                # Call Logic
-                return
+                if self.info.current_bet == 0:
+                    raise ValueError("No puedes hacer call si no hay apuesta activa, deberías hacer check")
+        
+                amount_to_call = self.info.current_bet - player.current_bet
+        
+                if action.amount != amount_to_call and player.stack > amount_to_call:
+                    raise ValueError(f"Debes igualar exactamente la apuesta de {amount_to_call}")
+        
+                if action.amount > player.stack:
+                    raise ValueError("No puedes pagar más fichas de las que tienes")
+        
+                actual_amount = min(amount_to_call, player.stack)
+                player.stack -= actual_amount
+                player.current_bet += actual_amount
+        
+                if player.stack == 0:   
+                    player.is_all_in = True
+        
+            case ActionType.RAISE:
+                amount_to_call = self.info.current_bet - player.current_bet
+        
+                if action.amount > player.stack:
+                    raise ValueError("No puedes apostar más de lo que tienes en tu stack")
+        
+                minimum_total_bet = amount_to_call + self.info.min_raise
+        
+                if action.amount < minimum_total_bet and action.amount < player.stack:
+                    raise ValueError(
+                        f"El raise debe ser al menos de {minimum_total_bet}. Estás intentando apostar {action.amount}."
+                    )
+        
+                player.stack -= action.amount
+                player.current_bet += action.amount
+        
+                if player.current_bet > self.info.current_bet:
+                    raise_amount = player.current_bet - self.info.current_bet
+                    self.info.min_raise = raise_amount
+                    self.info.current_bet = player.current_bet
+        
+                if player.stack == 0:
+                    player.is_all_in = True
 
     def run_round(self):
 

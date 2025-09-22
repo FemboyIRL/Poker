@@ -14,7 +14,8 @@ class Player:
         self.id = player_id
         self.name = name
         self.stack = stack
-        self.current_bet = 0
+        self.current_bet = 0 
+        self.total_bet = 0
         self.status = PlayerStatus.ACTIVE
         self.is_all_in = False
         self.hole_cards: List[str] = []
@@ -31,13 +32,18 @@ class Player:
             self.is_all_in = True
         self.stack -= amount
         self.current_bet += amount
+        self.total_bet += amount
         return amount
 
     def fold(self):
         self.status = PlayerStatus.FOLDED
         self.current_bet = 0
+        self.total_bet = 0
         self.is_all_in = False
 
     def reset_for_new_round(self):
+        if self.status != PlayerStatus.OUT:
+            self.status == PlayerStatus.ACTIVE
         self.current_bet = 0
+        self.total_bet = 0
         self.is_all_in = False
